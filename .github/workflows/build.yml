@@ -10,26 +10,71 @@ jobs:
    name: Deploy to Kubernetes
    runs-on: ubuntu-latest
    steps:
-    - name: Send email notification
-      if: always()
-      uses: dawidd6/action-send-mail@v3
-      with:
-        server_address: ${{ secrets.SMTP_SERVER }}
-        server_port: ${{ secrets.SMTP_PORT }}
-        username: ${{ secrets.SMTP_USERNAME }}
-        password: ${{ secrets.SMTP_PASSWORD }}
-        subject: GitHub Action Status - ${{ job.status }}
-        to: ${{ secrets.RECIPIENT_EMAIL }}
-        from: GitHub Actions <${{ secrets.SMTP_USERNAME }}>
-        content_type: text/plain
-        body: |
-          Hello,
-    
-          This is an automated notification of the status of your GitHub Actions workflow.
-    
-          Job Status: ${{ job.status }}
-    
-          - GitHub Actions
+      - name: Checkout code again
+        uses: actions/checkout@v2  # Checkout code fresh in this job
+      - name: Check for deployment file
+        run: |
+          echo "Checking for deployment-service.yml in repository root:"
+          if [ -f "./deployment-service.yml" ]; then
+            echo "Found deployment file. Contents:"
+            cat ./deployment-service.yml
+          else
+            echo "Deployment file not found. Directory contents:"
+            ls -la
+            echo "Searching in subdirectories:"
+            find . -name "deployment-service.yml" -type f
+            echo "FAILURE: Cannot proceed with deployment without deployment-service.yml"
+            exit 1
+          fi
+      - name: Docker pull image
+        run: docker pull pavithra13/tic-tac-toe:latest
+      - name: Install Trivy
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y wget apt-transport-https gnupg lsb-release
+          wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | sudo apt-key add -
+          echo "deb https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -sc) main" | sudo tee -a /etc/apt/sources.list.d/trivy.list
+          sudo apt-get update
+          sudo apt-get install -y trivy
+      - name: Image scan
+        run: trivy image pavithra13/tic-tac-toe:latest > trivyimagedeploy.txt
+      - name: Deploy to container
+        run: docker run -d --name game -p 3000:3000 pavithra13/tic-tac-toe:latest
+      - name: Set up AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_DEFAULT_REGION }}
+      - name: Update kubeconfig for EKS
+        run: aws eks --region ${{ secrets.AWS_DEFAULT_REGION }} update-kubeconfig --name EKS_CLOUD
+      - name: Install kubectl
+        run: |
+          curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+          chmod +x kubectl
+          sudo mv kubectl /usr/local/bin/
+          kubectl version --client
+
+      - name: Send email notification
+        if: always()
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: ${{ secrets.SMTP_SERVER }}
+          server_port: ${{ secrets.SMTP_PORT }}
+          username: ${{ secrets.SMTP_USERNAME }}
+          password: ${{ secrets.SMTP_PASSWORD }}
+          subject: GitHub Action Status - ${{ job.status }}
+          to: ${{ secrets.RECIPIENT_EMAIL }}
+          from: GitHub Actions <${{ secrets.SMTP_USERNAME }}>
+          content_type: text/plain
+          body: |
+            Hello,
+      
+            This is an automated notification of the status of your GitHub Actions workflow.
+      
+            Job Status: ${{ job.status }}
+      
+            - GitHub Actions
 
       
       
