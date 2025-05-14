@@ -96,7 +96,7 @@ jobs:
  
   deploy:
     name: Deploy to Kubernetes
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted]
     steps:
       - name: Checkout code again
         uses: actions/checkout@v2  # Checkout code fresh in this job
