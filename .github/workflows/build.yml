@@ -132,9 +132,17 @@ jobs:
           sudo mv kubectl /usr/local/bin/
           kubectl version --client
 
-      - name: Deploy to Kubernetes
-        run: kubectl apply -f ./deployment-service.yml
-        working-directory: ${{ github.workspace }}
+      - name: Check for deployment file
+        run: |
+          if [ -f "./deployment-service.yml" ]; then
+            echo "Deployment file exists"
+            cat ./deployment-service.yml
+          else
+            echo "Deployment file does not exist. Current directory contents:"
+            ls -la
+            echo "Skipping Kubernetes deployment step"
+          fi
+
 
 
 
