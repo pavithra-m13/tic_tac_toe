@@ -1,27 +1,23 @@
-# Use Node.js base image
+# Use the official Node.js 16 image
 FROM node:16
 
-# Create a non-root user and group
-RUN groupadd -r nodegroup && useradd -r -m -g nodegroup nodeuser
-
-# Set the working directory
+# Set the working directory in the container
 WORKDIR /app
 
-# Copy the package.json files and install dependencies as a non-root user
+# Copy package.json and package-lock.json
 COPY package*.json ./
+
+# Install dependencies
 RUN npm install
 
-# Copy the full source code
+# Copy the entire React app source code to the container
 COPY . .
 
-# Change the ownership of the /app directory to the non-root user
-RUN chown -R nodeuser:nodegroup /app
+# Build the React app
+RUN npm run build
 
-# Set the non-root user for running the application
-USER nodeuser
-
-# Expose port 3000 (used by React dev server)
+# Expose port 3000 (the port your Node.js app runs on)
 EXPOSE 3000
 
-# Start the React development server
+# Start the Node.js app
 CMD ["npm", "start"]
