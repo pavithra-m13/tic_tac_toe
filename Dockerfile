@@ -23,7 +23,6 @@ RUN npm install -g serve
 COPY --from=build /app/build /app/build
 
 # Expose the port the app will run on
-EXPOSE 80  # Exposing port 80 for HTTP traffic (could be 3000 if you prefer)
-
-# Start serving the app with 'serve' on port 80
-CMD ["serve", "-s", "/app/build", "-l", "80"]
+EXPOSE 3000  
+# Start serving the app with 'serve' on port 3000
+CMD ["serve", "-s", "/app/build", "-l", "3000"]
