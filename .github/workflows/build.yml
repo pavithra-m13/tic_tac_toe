@@ -1,8 +1,10 @@
 name: Build
+
 on:
   push:
     branches:
       - main
+
 jobs:
   build:
     name: Build
@@ -11,26 +13,28 @@ jobs:
       - uses: actions/checkout@v2
         with:
           fetch-depth: 0  # Shallow clones should be disabled for a better relevancy of analysis
+      
       - uses: sonarsource/sonarqube-scan-action@master
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+      
       # If you wish to fail your job when the Quality Gate is red, uncomment the
       # following lines. This would typically be used to fail a deployment.
       # - uses: sonarsource/sonarqube-quality-gate-action@master
       #   timeout-minutes: 5
       #   env:
       #     SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-
+      
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
           node-version: '18'
-
+          cache: 'npm'  # Added cache to improve performance
+      
       - name: Install dependencies
-        run: npm install
-      - name: NPM Install
-        run: npm install # Add your specific npm install command
+        run: npm ci  # Changed to npm ci for more reliable installations
+      
       - name: Install Trivy
         run: |
           sudo apt-get update
@@ -39,5 +43,6 @@ jobs:
           echo "deb https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -sc) main" | sudo tee -a /etc/apt/sources.list.d/trivy.list
           sudo apt-get update
           sudo apt-get install -y trivy
-      - name: Install Trivy
+      
+      - name: Run Trivy vulnerability scan
         run: trivy fs --format table . > trivyfs.txt
