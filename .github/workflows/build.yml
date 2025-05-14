@@ -32,4 +32,4 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y trivy
       - name: Install Trivy
-        run: trivy fs . > trivyfs.txt
+        run: trivy fs --format table . > trivyfs.txt
