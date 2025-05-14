@@ -132,15 +132,26 @@ jobs:
           sudo mv kubectl /usr/local/bin/
           kubectl version --client
 
-      - name: Check for deployment file
+      - name: Find deployment file
         run: |
-          if [ -f "./deployment-service.yml" ]; then
-            echo "Deployment file exists"
-            cat ./deployment-service.yml
+          echo "Searching for deployment-service.yml in all possible locations:"
+          find $(pwd) -name "deployment-service.yml" -type f | tee deployment-locations.txt
+          
+          if [ -s deployment-locations.txt ]; then
+            echo "Found deployment file(s) at:"
+            cat deployment-locations.txt
+            # Use the first found file for deployment
+            DEPLOYMENT_FILE=$(head -n 1 deployment-locations.txt)
+            echo "Will use deployment file at: $DEPLOYMENT_FILE"
+            echo "Contents of deployment file:"
+            cat "$DEPLOYMENT_FILE"
+            
+            # Add logic to apply the found file if needed
+            kubectl apply -f "$DEPLOYMENT_FILE"
           else
-            echo "Deployment file does not exist. Current directory contents:"
+            echo "No deployment-service.yml file found in repository"
+            echo "Top-level directory contents:"
             ls -la
-            echo "Skipping Kubernetes deployment step"
           fi
 
 
