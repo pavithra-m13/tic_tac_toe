@@ -80,7 +80,7 @@ jobs:
           
           echo "Package scan completed. Results:"
           cat trivy-results/package-scan.txt
-
+      
       - name: Docker Build and push
         run: |
           docker build -t tic-tac-toe .
@@ -100,6 +100,15 @@ jobs:
       - name: Docker pull image
         run: docker pull pavithra13/tic-tac-toe:latest
       
+      - name: Install Trivy
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y wget apt-transport-https gnupg lsb-release
+          wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | sudo apt-key add -
+          echo "deb https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -sc) main" | sudo tee -a /etc/apt/sources.list.d/trivy.list
+          sudo apt-get update
+          sudo apt-get install -y trivy
+
       - name: Image scan
         run: trivy image pavithra13/tic-tac-toe:latest > trivyimagedeploy.txt
       
