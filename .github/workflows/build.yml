@@ -151,6 +151,14 @@ jobs:
           sudo mv kubectl /usr/local/bin/
           kubectl version --client
 
+      - name: Update aws-auth ConfigMap with IAM Role for GitHub Actions
+        run: |
+          echo "Updating aws-auth ConfigMap to grant access to GitHub Actions runner IAM role..."
+          ROLE_ARN=$(aws sts get-caller-identity --query Arn --output text)
+          echo "Adding $ROLE_ARN to aws-auth configmap"
+          kubectl -n kube-system get configmap/aws-auth -o yaml | \
+          sed "/mapRoles:/a\  - rolearn: $ROLE_ARN\n    username: github-actions\n    groups:\n      - system:masters" | \
+          kubectl apply -f -
       - name: Find deployment file
         run: |
           echo "Searching for deployment-service.yml in all possible locations:"
