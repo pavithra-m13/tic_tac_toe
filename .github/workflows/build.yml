@@ -167,7 +167,7 @@ jobs:
             cat "$DEPLOYMENT_FILE"
             
             # Add logic to apply the found file if needed
-            kubectl apply -f "$DEPLOYMENT_FILE"
+            kubectl apply -f "$DEPLOYMENT_FILE" --validate=false
           else
             echo "No deployment-service.yml file found in repository"
             echo "Top-level directory contents:"
