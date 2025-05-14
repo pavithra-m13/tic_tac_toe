@@ -19,21 +19,30 @@ jobs:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
       
-      # If you wish to fail your job when the Quality Gate is red, uncomment the
-      # following lines. This would typically be used to fail a deployment.
-      # - uses: sonarsource/sonarqube-quality-gate-action@master
-      #   timeout-minutes: 5
-      #   env:
-      #     SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-      
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
           node-version: '18'
-          cache: 'npm'  # Added cache to improve performance
       
-      - name: Install dependencies
-        run: npm ci  # Changed to npm ci for more reliable installations
+      - name: Debug - List files before install
+        run: ls -la
+      
+      - name: Show package.json content
+        run: cat package.json || echo "No package.json found"
+      
+      - name: Install dependencies - Verbose mode
+        run: npm install --verbose
+        
+      - name: Debug - Check if node_modules exists
+        run: |
+          if [ -d "node_modules" ]; then
+            echo "node_modules directory exists"
+            ls -la node_modules | head -n 10
+          else
+            echo "node_modules directory does NOT exist"
+            echo "Current directory content:"
+            ls -la
+          fi
       
       - name: Install Trivy
         run: |
@@ -45,4 +54,18 @@ jobs:
           sudo apt-get install -y trivy
       
       - name: Run Trivy vulnerability scan
-        run: trivy fs --format table . > trivyfs.txt
+        run: |
+          # Try creating a simple package.json if none exists
+          if [ ! -f "package.json" ]; then
+            echo "Creating minimal package.json for scanning"
+            echo '{"name":"temp-project","version":"1.0.0"}' > package.json
+            npm install --no-save lodash
+          fi
+          
+          # Run the scan with additional verbose output
+          echo "Running Trivy scan..."
+          trivy fs --format table . > trivyfs.txt
+          
+          # Show scan results
+          echo "Trivy scan completed. Results:"
+          cat trivyfs.txt
