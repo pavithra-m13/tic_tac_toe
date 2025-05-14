@@ -1,17 +1,24 @@
 # Use Node.js base image
 FROM node:16
 
-# Set working directory
+# Create a non-root user and group
+RUN groupadd -r nodegroup && useradd -r -m -g nodegroup nodeuser
+
+# Set the working directory
 WORKDIR /app
 
-# Copy dependencies files
+# Copy the package.json files and install dependencies as a non-root user
 COPY package*.json ./
-
-# Install dependencies
 RUN npm install
 
 # Copy the full source code
 COPY . .
+
+# Change the ownership of the /app directory to the non-root user
+RUN chown -R nodeuser:nodegroup /app
+
+# Set the non-root user for running the application
+USER nodeuser
 
 # Expose port 3000 (used by React dev server)
 EXPOSE 3000
