@@ -8,7 +8,7 @@ on:
 jobs:
   build:
     name: Build
-    runs-on: ubuntu@latest
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
         with:
@@ -95,7 +95,7 @@ jobs:
 
   deploy:
     needs: build
-    runs-on: ubuntu@latest
+    runs-on: ubuntu-latest
     steps:
       - name: Docker pull image
         run: docker pull pavithra13/tic-tac-toe:latest
