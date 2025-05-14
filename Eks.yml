@@ -1,73 +1,157 @@
-name: Build,Analyze,scan
-
+name: Build, Scan, Deploy
 on:
   push:
     branches:
       - main
-
-
 jobs:
-  build-analyze-scan:
+  build:
     name: Build
-    runs-on: [self-hosted]
+    runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
+      - uses: actions/checkout@v2
         with:
           fetch-depth: 0  # Shallow clones should be disabled for a better relevancy of analysis
-
-      - name: Build and analyze with SonarQube
-        uses: sonarsource/sonarqube-scan-action@master
+      - uses: sonarsource/sonarqube-scan-action@master
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
           
-      - name: npm install dependency
-        run: npm install
-
-      - name: Trivy file scan
-        run: trivy fs . > trivyfs.txt
-
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          
+      - name: Debug - List files before install
+        run: ls -la
+        
+      - name: Show package.json content
+        run: cat package.json || echo "No package.json found"
+        
+      - name: Install dependencies - Verbose mode
+        run: npm install --verbose
+        
+      - name: Debug - Check if node_modules exists
+        run: |
+          if [ -d "node_modules" ]; then
+            echo "node_modules directory exists"
+            ls -la node_modules | head -n 10
+          else
+            echo "node_modules directory does NOT exist"
+            echo "Current directory content:"
+            ls -la
+          fi
+          
+      - name: Install Trivy
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y wget apt-transport-https gnupg lsb-release
+          wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | sudo apt-key add -
+          echo "deb https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -sc) main" | sudo tee -a /etc/apt/sources.list.d/trivy.list
+          sudo apt-get update
+          sudo apt-get install -y trivy
+      # Store the scan results directly in the logs
+      
+      - name: Run Trivy vulnerability scan
+        run: |
+          # Try creating a simple package.json if none exists
+          if [ ! -f "package.json" ]; then
+            echo "Creating minimal package.json for scanning"
+            echo '{"name":"temp-project","version":"1.0.0"}' > package.json
+            npm install --no-save lodash
+          fi
+          # Create directory for results
+          mkdir -p trivy-results
+          # Run specific Node.js dependency scan
+          echo "Running Trivy NPM scan..."
+          trivy fs --scanners vuln --skip-dirs .git,.github,.scannerwork --format table --severity HIGH,CRITICAL . | tee trivy-results/trivyfs.txt
+          # Show scan results
+          echo "Trivy scan completed. Results:"
+          cat trivy-results/trivyfs.txt
+          # Also try direct package.json scan
+          echo "Running direct package.json scan..."
+          trivy fs --scanners vuln --severity HIGH,CRITICAL package.json | tee trivy-results/package-scan.txt
+          echo "Package scan completed. Results:"
+          cat trivy-results/package-scan.txt
+          
       - name: Docker Build and push
         run: |
           docker build -t tic-tac-toe .
-          docker tag tic-tac-toe sevenajay/tic-tac-toe:latest
+          docker tag tic-tac-toe pavithra13/tic-tac-toe:latest
           docker login -u ${{ secrets.DOCKERHUB_USERNAME }} -p ${{ secrets.DOCKERHUB_TOKEN }}
-          docker push sevenajay/tic-tac-toe:latest
+          docker push pavithra13/tic-tac-toe:latest
         env:
           DOCKER_CLI_ACI: 1
-
       - name: Image scan
-        run: trivy image sevenajay/tic-tac-toe:latest > trivyimage.txt
-
+        run: trivy image pavithra13/tic-tac-toe:latest > trivyimage.txt
+        
   deploy:
-   needs: build-analyze-scan   
-   runs-on: [self-hosted]
-   steps:
-      - name: docker pull image
-        run: docker pull sevenajay/tic-tac-toe:latest
-
+    name: Deploy to Kubernetes
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code again
+        uses: actions/checkout@v2  # Checkout code fresh in this job
+      - name: Check for deployment file
+        run: |
+          echo "Checking for deployment-service.yml in repository root:"
+          if [ -f "./deployment-service.yml" ]; then
+            echo "Found deployment file. Contents:"
+            cat ./deployment-service.yml
+          else
+            echo "Deployment file not found. Directory contents:"
+            ls -la
+            echo "Searching in subdirectories:"
+            find . -name "deployment-service.yml" -type f
+            echo "FAILURE: Cannot proceed with deployment without deployment-service.yml"
+            exit 1
+          fi
+          
+      - name: Docker pull image
+        run: docker pull pavithra13/tic-tac-toe:latest
+        
       - name: Image scan
-        run: trivy image sevenajay/tic-tac-toe:latest > trivyimagedeploy.txt  
-  
+        run: trivy image pavithra13/tic-tac-toe:latest > trivyimagedeploy.txt
+        
       - name: Deploy to container
-        run: docker run -d --name game -p 3000:3000 sevenajay/tic-tac-toe:latest
-
-      - name: Update kubeconfig
-        run: aws eks --region ap-south-1 update-kubeconfig --name EKS_CLOUD
+        run: docker run -d --name game -p 3000:3000 pavithra13/tic-tac-toe:latest
+        
+      - name: Set up AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_DEFAULT_REGION }}
+          
+      - name: Update kubeconfig for EKS
+        run: aws eks --region ${{ secrets.AWS_DEFAULT_REGION }} update-kubeconfig --name EKS_CLOUD
+        
+      - name: Install kubectl
+        run: |
+          curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+          chmod +x kubectl
+          sudo mv kubectl /usr/local/bin/
+          kubectl version --client
 
       - name: Deploy to kubernetes
         run: kubectl apply -f deployment-service.yml
   
-      - name: Send a Slack Notification
+     - name: Send email notification
         if: always()
-        uses: act10ns/slack@v1
+        uses: dawidd6/action-send-mail@v3
         with:
-          status: ${{ job.status }}
-          steps: ${{ toJson(steps) }}
-          channel: '#githubactions-eks'
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          server_address: ${{ secrets.SMTP_SERVER }}
+          server_port: ${{ secrets.SMTP_PORT }}
+          username: ${{ secrets.SMTP_USERNAME }}
+          password: ${{ secrets.SMTP_PASSWORD }}
+          subject: GitHub Action Status - ${{ job.status }}
+          to: ${{ secrets.RECIPIENT_EMAIL }}
+          from: GitHub Actions <${{ secrets.SMTP_USERNAME }}>
+          content_type: text/plain
+          body: |
+            Hello,
+            This is an automated notification of the status of your GitHub Actions workflow.
+            Job Status: ${{ job.status }}
+            - GitHub Actions
+
   
 
         
