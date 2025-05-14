@@ -53,6 +53,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y trivy
       
+      # Store the scan results directly in the logs
       - name: Run Trivy vulnerability scan
         run: |
           # Try creating a simple package.json if none exists
@@ -64,15 +65,9 @@ jobs:
           
           # Run the scan with additional verbose output
           echo "Running Trivy scan..."
-          trivy fs --format table . > trivyfs.txt
+          mkdir -p trivy-results
+          trivy fs --format table . | tee trivy-results/trivyfs.txt
           
           # Show scan results
           echo "Trivy scan completed. Results:"
-          cat trivyfs.txt
-      
-      - name: Upload Trivy results
-        uses: actions/upload-artifact@v3
-        with:
-          name: trivy-results
-          path: trivyfs.txt
-          if-no-files-found: warn
+          cat trivy-results/trivyfs.txt
