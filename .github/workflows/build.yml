@@ -80,3 +80,28 @@ jobs:
           
           echo "Package scan completed. Results:"
           cat trivy-results/package-scan.txt
+
+      - name: Docker Build and push
+        run: |
+          docker build -t tic-tac-toe .
+          docker tag tic-tac-toe pavithra13/tic-tac-toe:latest
+          docker login -u ${{ secrets.DOCKERHUB_USERNAME }} -p ${{ secrets.DOCKERHUB_TOKEN }}
+          docker push pavithra13/tic-tac-toe:latest
+        env:
+          DOCKER_CLI_ACI: 1
+      
+      - name: Image scan
+        run: trivy image pavithra13/tic-tac-toe:latest > trivyimage.txt
+
+  deploy:
+    needs: build
+    runs-on: [self-hosted]
+    steps:
+      - name: Docker pull image
+        run: docker pull pavithra13/tic-tac-toe:latest
+      
+      - name: Image scan
+        run: trivy image pavithra13/tic-tac-toe:latest > trivyimagedeploy.txt
+      
+      - name: Deploy to container
+        run: docker run -d --name game -p 3000:3000 pavithra13/tic-tac-toe:latest
