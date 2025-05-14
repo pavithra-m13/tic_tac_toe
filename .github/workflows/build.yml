@@ -93,10 +93,30 @@ jobs:
       - name: Image scan
         run: trivy image pavithra13/tic-tac-toe:latest > trivyimage.txt
 
+ 
   deploy:
-    needs: build
+    name: Deploy to Kubernetes
     runs-on: ubuntu-latest
+    needs: build  # This ensures deploy only runs after build succeeds
     steps:
+      - name: Checkout code again
+        uses: actions/checkout@v2  # Checkout code fresh in this job
+      
+      - name: Check for deployment file
+        run: |
+          echo "Checking for deployment-service.yml in repository root:"
+          if [ -f "./deployment-service.yml" ]; then
+            echo "Found deployment file. Contents:"
+            cat ./deployment-service.yml
+          else
+            echo "Deployment file not found. Directory contents:"
+            ls -la
+            echo "Searching in subdirectories:"
+            find . -name "deployment-service.yml" -type f
+            echo "FAILURE: Cannot proceed with deployment without deployment-service.yml"
+            exit 1
+          fi
+          
       - name: Docker pull image
         run: docker pull pavithra13/tic-tac-toe:latest
       
