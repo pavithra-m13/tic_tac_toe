@@ -70,10 +70,9 @@ jobs:
           echo "Trivy scan completed. Results:"
           cat trivyfs.txt
       
-      # Add this step to save the scan results as an artifact
       - name: Upload Trivy results
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: trivy-results
           path: trivyfs.txt
-          if-no-files-found: warn  # 'warn' instead of failing if file not found
+          if-no-files-found: warn
