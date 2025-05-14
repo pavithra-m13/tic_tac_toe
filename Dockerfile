@@ -1,17 +1,23 @@
-# Use Node.js LTS version as the base image
+# Use the official Node.js 16 image
 FROM node:16
-# Set the maintainer information
+
 # Set the working directory in the container
 WORKDIR /app
-# Copy package.json and package-lock.json to the container
-COPY package.json /app/
-# Install project dependencies
+
+# Copy package.json and package-lock.json
+COPY package*.json ./
+
+# Install dependencies
 RUN npm install
-# Copy the entire project files to the container
-COPY . /app/
-# Build the Next.js application for production
+
+# Copy the entire React app source code to the container
+COPY . .
+
+# Build the React app
 RUN npm run build
-# Expose the port used by your Next.js app (if needed)
+
+# Expose port 3000 (the port your Node.js app runs on)
 EXPOSE 3000
-# Define the default command to start the Next.js app
+
+# Start the Node.js app
 CMD ["npm", "start"]
