@@ -95,7 +95,7 @@ jobs:
 
   deploy:
     needs: build
-    runs-on: [self-hosted]
+    runs-on: ubuntu-latest
     steps:
       - name: Docker pull image
         run: docker pull pavithra13/tic-tac-toe:latest
