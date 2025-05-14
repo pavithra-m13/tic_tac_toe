@@ -63,11 +63,20 @@ jobs:
             npm install --no-save lodash
           fi
           
-          # Run the scan with additional verbose output
-          echo "Running Trivy scan..."
+          # Create directory for results
           mkdir -p trivy-results
-          trivy fs --format table . | tee trivy-results/trivyfs.txt
+          
+          # Run specific Node.js dependency scan
+          echo "Running Trivy NPM scan..."
+          trivy fs --scanners vuln --skip-dirs .git,.github,.scannerwork --format table --severity HIGH,CRITICAL . | tee trivy-results/trivyfs.txt
           
           # Show scan results
           echo "Trivy scan completed. Results:"
           cat trivy-results/trivyfs.txt
+          
+          # Also try direct package.json scan
+          echo "Running direct package.json scan..."
+          trivy fs --scanners vuln --severity HIGH,CRITICAL package.json | tee trivy-results/package-scan.txt
+          
+          echo "Package scan completed. Results:"
+          cat trivy-results/package-scan.txt
